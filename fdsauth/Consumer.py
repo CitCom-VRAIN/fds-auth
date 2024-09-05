@@ -1,13 +1,11 @@
 # Based on https://github.com/FIWARE/data-space-connector/blob/main/doc/deployment-integration/local-deployment/LOCAL.MD
 import os
 import requests
-from dotenv import load_dotenv
 
 
 class Consumer:
 
     def __init__(self) -> None:
-        load_dotenv()  # Load .env file
         self.protocol = os.environ.get("KEYCLOAK_PROTOCOL")
         self.keycloak_endpoint = os.environ.get("KEYCLOAK_ENDPOINT")
         self.keycloak_username = os.environ.get("KEYCLOAK_USERNAME")
@@ -116,8 +114,3 @@ class Consumer:
             return verifiable_credential
         else:
             return None
-
-
-consumer = Consumer()
-jwt_credential = consumer.get_auth_token()
-print(jwt_credential)
