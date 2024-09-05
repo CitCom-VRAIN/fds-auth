@@ -4,7 +4,7 @@ Python authenticator for FIWARE Data Space
 ## Installation
 In your project folder run:
 ```bash
-git submodule add https://github.com/CitCom-VRAIN/fds-auth.git ./lib/fdsauth
+git submodule add -f https://github.com/CitCom-VRAIN/fds-auth.git ./lib/fdsauth
 ```
 
 ## Usage
