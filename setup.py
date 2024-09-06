@@ -12,8 +12,8 @@ setup(
     author_email="joamoteo@upv.es",
     description="Python authentication for FIWARE Data Space",
     long_description=long_description,
-    long_description_content_type="text/markdown",  # Important if you're using Markdown
-    url="https://github.com/CitCom-VRAIN/fdsauth",  # Link to your GitHub repository
+    long_description_content_type="text/markdown",
+    url="https://github.com/CitCom-VRAIN/fdsauth",
     packages=find_packages(),
     install_requires=["requests"],
 )
