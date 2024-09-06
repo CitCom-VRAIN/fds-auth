@@ -4,11 +4,11 @@ Python authenticator for FIWARE Data Space
 ## Installation
 In your project folder run:
 ```bash
-git submodule add -f https://github.com/CitCom-VRAIN/fds-auth.git ./lib/fdsauth
+pip install fdsauth
 ```
 
 ## Usage
-First, define following environment variables in your `.env` file. Substitute example values for your own values:
+First, define following environment variables in your `.env` file. Substitute example values for your own:
 ```bash
 KEYCLOAK_PROTOCOL=http
 KEYCLOAK_ENDPOINT=keycloak-consumer.127.0.0.1.nip.io:8080
@@ -25,7 +25,14 @@ jwt_credential = consumer.get_auth_token()
 print(jwt_credential)
 ```
 
-# Update
+## Development
 ```bash
-git submodule update
+# Create virtual env
+python3 -m venv ./venv && source ./venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Build
+python setup.py sdist bdist_wheel
 ```
