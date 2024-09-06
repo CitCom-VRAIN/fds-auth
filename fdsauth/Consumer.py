@@ -1,30 +1,74 @@
-# Based on https://github.com/FIWARE/data-space-connector/blob/main/doc/deployment-integration/local-deployment/LOCAL.MD
 import os
 import requests
+from requests.exceptions import RequestException
 
 
 class Consumer:
-
     def __init__(self) -> None:
+        """
+        Initialize the Consumer class by retrieving the necessary credentials
+        from environment variables. These credentials are required to authenticate
+        and interact with the Keycloak server.
+
+        Raises:
+            ValueError: If any required environment variable is missing.
+        """
         self.protocol = os.environ.get("KEYCLOAK_PROTOCOL")
         self.keycloak_endpoint = os.environ.get("KEYCLOAK_ENDPOINT")
         self.keycloak_username = os.environ.get("KEYCLOAK_USERNAME")
         self.keycloak_password = os.environ.get("KEYCLOAK_PASSWORD")
 
+        # Ensure all required environment variables are provided
+        if not all(
+            [
+                self.protocol,
+                self.keycloak_endpoint,
+                self.keycloak_username,
+                self.keycloak_password,
+            ]
+        ):
+            raise ValueError("Missing one or more required environment variables.")
+
+        # Use a session to optimize HTTP connections
+        self.session = requests.Session()
+
     def get_auth_token(self):
-        access_token = self.get_access_token()
-        offer_uri = self.get_credential_offer_uri(access_token)
-        pre_authorized_code = self.retrieve_actual_offer(access_token, offer_uri)
-        credential_access_token = self.exchange_pre_authorized_code(pre_authorized_code)
-        verifiable_credential = self.get_verifiable_credential(credential_access_token)
+        """
+        Orchestrates the process of retrieving a verifiable credential from the Keycloak server.
+        This involves multiple steps including obtaining an access token, credential offer URI,
+        exchanging pre-authorized codes, and finally retrieving the verifiable credential.
 
-        return verifiable_credential
+        Returns:
+            str: The verifiable credential in `jwt_vc` format.
 
-    # Get an AccessToken from Keycloak
+        Raises:
+            Exception: If any of the intermediate steps fail.
+        """
+        try:
+            access_token = self.get_access_token()
+            offer_uri = self.get_credential_offer_uri(access_token)
+            pre_authorized_code = self.retrieve_actual_offer(access_token, offer_uri)
+            credential_access_token = self.exchange_pre_authorized_code(
+                pre_authorized_code
+            )
+            verifiable_credential = self.get_verifiable_credential(
+                credential_access_token
+            )
+            return verifiable_credential
+        except Exception as e:
+            raise Exception(f"Failed to obtain verifiable credential: {str(e)}")
+
     def get_access_token(self):
-        url = "{PROTOCOL}://{KEYCLOAK_ENDPOINT}/realms/test-realm/protocol/openid-connect/token".format(
-            PROTOCOL=self.protocol, KEYCLOAK_ENDPOINT=self.keycloak_endpoint
-        )
+        """
+        Obtains an OAuth2 access token from Keycloak using the username and password credentials.
+
+        Returns:
+            str: Access token if successful.
+
+        Raises:
+            RequestException: If the request fails.
+        """
+        url = f"{self.protocol}://{self.keycloak_endpoint}/realms/test-realm/protocol/openid-connect/token"
 
         headers = {"Accept": "*/*", "Content-Type": "application/x-www-form-urlencoded"}
         data = {
@@ -34,49 +78,91 @@ class Consumer:
             "password": self.keycloak_password,
         }
 
-        response = requests.post(url, headers=headers, data=data)
-        if response.status_code == 200:
+        try:
+            response = self.session.post(url, headers=headers, data=data)
+            response.raise_for_status()  # Raises HTTPError if status code is not 200
             access_token = response.json().get("access_token")
+            if not access_token:
+                raise ValueError("Access token not found in response.")
             return access_token
-        else:
-            return None
+        except RequestException as e:
+            raise RequestException(f"Failed to get access token: {str(e)}")
 
-    # Get a credential offer uri(for the `user-credential), using a retrieved AccessToken:
     def get_credential_offer_uri(self, access_token):
-        url = "{PROTOCOL}://{KEYCLOAK_ENDPOINT}/realms/test-realm/protocol/oid4vc/credential-offer-uri?credential_configuration_id=user-credential".format(
-            PROTOCOL=self.protocol, KEYCLOAK_ENDPOINT=self.keycloak_endpoint
-        )
+        """
+        Retrieves the credential offer URI using a valid access token.
 
-        headers = {"Authorization": "Bearer {}".format(access_token)}
+        Args:
+            access_token (str): The access token obtained from Keycloak.
 
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json().get("issuer") + response.json().get("nonce")
-        else:
-            return None
+        Returns:
+            str: The credential offer URI, constructed from issuer and nonce.
 
-    # Use the offer uri(e.g. the issuerand nonce fields), to retrieve the actual offer:
+        Raises:
+            RequestException: If the request fails.
+        """
+        url = f"{self.protocol}://{self.keycloak_endpoint}/realms/test-realm/protocol/oid4vc/credential-offer-uri"
+        url += "?credential_configuration_id=user-credential"
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        try:
+            response = self.session.get(url, headers=headers)
+            response.raise_for_status()
+            response_data = response.json()
+            issuer = response_data.get("issuer")
+            nonce = response_data.get("nonce")
+            if not issuer or not nonce:
+                raise ValueError("Issuer or nonce missing in response.")
+            return f"{issuer}{nonce}"
+        except RequestException as e:
+            raise RequestException(f"Failed to get credential offer URI: {str(e)}")
+
     def retrieve_actual_offer(self, access_token, offer_uri):
-        url = offer_uri
+        """
+        Retrieves the actual credential offer from the provided offer URI.
 
-        headers = {"Authorization": "Bearer {}".format(access_token)}
+        Args:
+            access_token (str): The access token obtained from Keycloak.
+            offer_uri (str): The credential offer URI.
 
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return (
-                response.json()
-                .get("grants")
-                .get("urn:ietf:params:oauth:grant-type:pre-authorized_code")
-                .get("pre-authorized_code")
-            )
-        else:
-            return None
+        Returns:
+            str: Pre-authorized code.
 
-    # Exchange the pre-authorized code from the offer with an AccessToken at the authorization server:
+        Raises:
+            RequestException: If the request fails.
+        """
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        try:
+            response = self.session.get(offer_uri, headers=headers)
+            response.raise_for_status()
+            grants = response.json().get("grants")
+            if not grants:
+                raise ValueError("Grants not found in response.")
+            pre_authorized_code = grants.get(
+                "urn:ietf:params:oauth:grant-type:pre-authorized_code", {}
+            ).get("pre-authorized_code")
+            if not pre_authorized_code:
+                raise ValueError("Pre-authorized code not found.")
+            return pre_authorized_code
+        except RequestException as e:
+            raise RequestException(f"Failed to retrieve actual offer: {str(e)}")
+
     def exchange_pre_authorized_code(self, pre_authorized_code):
-        url = "{PROTOCOL}://{KEYCLOAK_ENDPOINT}/realms/test-realm/protocol/openid-connect/token".format(
-            PROTOCOL=self.protocol, KEYCLOAK_ENDPOINT=self.keycloak_endpoint
-        )
+        """
+        Exchanges the pre-authorized code for an access token to obtain a verifiable credential.
+
+        Args:
+            pre_authorized_code (str): The pre-authorized code.
+
+        Returns:
+            str: Credential access token.
+
+        Raises:
+            RequestException: If the request fails.
+        """
+        url = f"{self.protocol}://{self.keycloak_endpoint}/realms/test-realm/protocol/openid-connect/token"
 
         headers = {"Accept": "*/*", "Content-Type": "application/x-www-form-urlencoded"}
         data = {
@@ -84,23 +170,35 @@ class Consumer:
             "code": pre_authorized_code,
         }
 
-        response = requests.post(url, headers=headers, data=data)
-        if response.status_code == 200:
+        try:
+            response = self.session.post(url, headers=headers, data=data)
+            response.raise_for_status()
             access_token = response.json().get("access_token")
+            if not access_token:
+                raise ValueError("Credential access token not found.")
             return access_token
-        else:
-            return None
+        except RequestException as e:
+            raise RequestException(f"Failed to exchange pre-authorized code: {str(e)}")
 
-    # Use the returned access token to get the actual credential:
     def get_verifiable_credential(self, credential_access_token):
-        url = "{PROTOCOL}://{KEYCLOAK_ENDPOINT}/realms/test-realm/protocol/oid4vc/credential".format(
-            PROTOCOL=self.protocol, KEYCLOAK_ENDPOINT=self.keycloak_endpoint
-        )
+        """
+        Retrieves the actual verifiable credential using the credential access token.
+
+        Args:
+            credential_access_token (str): The access token specific to the credential.
+
+        Returns:
+            str: The verifiable credential in JWT format.
+
+        Raises:
+            RequestException: If the request fails.
+        """
+        url = f"{self.protocol}://{self.keycloak_endpoint}/realms/test-realm/protocol/oid4vc/credential"
 
         headers = {
             "Accept": "*/*",
             "Content-Type": "application/json",
-            "Authorization": "Bearer {}".format(credential_access_token),
+            "Authorization": f"Bearer {credential_access_token}",
         }
 
         data = {
@@ -108,9 +206,20 @@ class Consumer:
             "format": "jwt_vc",
         }
 
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
+        try:
+            response = self.session.post(url, headers=headers, json=data)
+            response.raise_for_status()
             verifiable_credential = response.json().get("credential")
+            if not verifiable_credential:
+                raise ValueError("Verifiable credential not found.")
             return verifiable_credential
-        else:
-            return None
+        except RequestException as e:
+            raise RequestException(
+                f"Failed to retrieve verifiable credential: {str(e)}"
+            )
+
+    def __del__(self):
+        """
+        Ensures that the session is properly closed when the object is destroyed.
+        """
+        self.session.close()
