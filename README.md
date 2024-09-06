@@ -1,5 +1,5 @@
-# fds-auth
-Python authenticator for FIWARE Data Space
+# fdsauth
+Python authentication for FIWARE Data Space
 
 ## Installation
 In your project folder run:
@@ -18,8 +18,13 @@ KEYCLOAK_PASSWORD=test
 
 Usage example:
 ```python
-from lib.fdsauth.Client import Consumer
+from dotenv import load_dotenv
+from fdsauth import Consumer
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Create a Consumer instance and retrieve the verifiable credential
 consumer = Consumer()
 jwt_credential = consumer.get_auth_token()
 print(jwt_credential)
@@ -35,4 +40,7 @@ pip install -r requirements.txt
 
 # Build
 python setup.py sdist bdist_wheel
+
+# Local testing
+pip install dist/fdsauth-X.X.X-py3-none-any.whl
 ```
