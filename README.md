@@ -47,7 +47,7 @@ import os
 # Load environment variables from .env file
 load_dotenv()
 
-
+#Create a Consumer instance and retrieve the auth token
 consumer = Consumer(
     keycloak_url=os.getenv("KEYCLOAK_URL"),
     data_service_url=os.getenv("DATA_SERVICE_URL"),
