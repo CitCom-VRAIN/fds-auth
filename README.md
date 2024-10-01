@@ -41,7 +41,7 @@ export DID_PATH="./certs/did.json"
 Usage example:
 ```python
 from dotenv import load_dotenv
-from fdsauth import Consumer, Provider
+from fdsauth import Consumer
 import os
 
 # Load environment variables from .env file
