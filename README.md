@@ -18,26 +18,49 @@ pip install fdsauth
 ```
 
 ## Usage  💻
-First, define following environment variables in your `.env` file. Substitute example values for your own:
+First a DID (Decentralized Identifier) and the corresponding key-material is required. You can create such via:
 ```bash
-KEYCLOAK_PROTOCOL=http
-KEYCLOAK_ENDPOINT=keycloak-consumer.127.0.0.1.nip.io:8080
-KEYCLOAK_USERNAME=test-user
-KEYCLOAK_PASSWORD=test
+mkdir certs && cd certs
+docker run -v $(pwd):/cert quay.io/wi_stefan/did-helper:0.1.1
+```
+
+Define following environment variables in your `.env` file. Substitute example values for your own:
+```bash
+export KEYCLOAK_URL="http://keycloak-consumer.127.0.0.1.nip.io:8080"
+export DATA_SERVICE_URL="http://mp-data-service.127.0.0.1.nip.io:8080"
+export REALM="test-realm"
+export CLIENT_ID="admin-cli"
+export USERNAME="test-user"
+export PASSWORD="test"
+export CREDENTIAL_CONFIGURATION_ID="user-credential"
+export CREDENTIAL_IDENTIFIER="user-credential"
+export PRIVATE_KEY_PATH="./certs/private-key.pem"
+export DID_PATH="./certs/did.json"
 ```
 
 Usage example:
 ```python
 from dotenv import load_dotenv
-from fdsauth import Consumer
+from fdsauth import Consumer, Provider
+import os
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Create a Consumer instance and retrieve the verifiable credential
-consumer = Consumer()
-jwt_credential = consumer.get_auth_token()
-print(jwt_credential)
+
+consumer = Consumer(
+    keycloak_url=os.getenv("KEYCLOAK_URL"),
+    data_service_url=os.getenv("DATA_SERVICE_URL"),
+    realm=os.getenv("REALM"),
+    client_id=os.getenv("CLIENT_ID"),
+    username=os.getenv("USERNAME"),
+    password=os.getenv("PASSWORD"),
+    credential_configuration_id=os.getenv("CREDENTIAL_CONFIGURATION_ID"),
+    credential_identifier=os.getenv("CREDENTIAL_IDENTIFIER"),
+    private_key_path=os.getenv("PRIVATE_KEY_PATH"),
+    did_path=os.getenv("DID_PATH"),
+)
+auth_token = consumer.get_auth_token()
 ```
 
 ## Development 🚀
